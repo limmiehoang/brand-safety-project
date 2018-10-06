@@ -1,0 +1,10 @@
+# path configuration
+DATA_PATH = '../../data/'
+BING_SEARCH_URL = 'https://www.bing.com/search?format=RSS&q='
+ACCIDENT_KEYWORDS_FILE = DATA_PATH + '50_accident_keywords.txt'
+ACCIDENT_PAGES_FILE = DATA_PATH + '500_accident_pages.txt'
+ORDINARY_PAGES_FILE = DATA_PATH + '500_ordinary_pages.txt'
+ACCIDENT_DATA_FOLDER = DATA_PATH + 'accident_data/'
+ORDINARY_DATA_FOLDER = DATA_PATH + 'ordinary_data/'
+ALL_ACCIDENT_NOUNS_FILE = ACCIDENT_DATA_FOLDER + 'all_accident_nouns.txt'
+ALL_ORDINARY_NOUNS_FILE = ORDINARY_DATA_FOLDER + 'all_ordinary_nouns.txt'
