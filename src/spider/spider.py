@@ -1,39 +1,55 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import helper as hp
 import spider_config as cf
 import xml.etree.ElementTree as et
 import requests
+import operator
 
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 from bs4            import BeautifulSoup, NavigableString, Tag
 from underthesea    import pos_tag
 
-def getLinkFromRSS(keyword, fileName):
+def getLinksFromKeyword(keyword):
     links = []
     counter = 0
     first = 1
-    while counter < 10:
+    while counter < 12:
         try:
             search_url = hp.makeSearchURL(keyword, first)
             rss = et.parse(urlopen(search_url)).getroot()
             temp = []
             for link in rss.iter('link'):
                 link = link.text
-                if len(link) > 85 and "bing" not in link:
+                if hp.isValidLink(link):
                     temp.append(link)
                     counter += 1
-                if counter == 10:
+                if counter == 12:
                     break
             links = links + temp
             first = first + 10
         except Exception as e:
             print(e)
-    hp.writeListIntoFile(links, fileName)
+    return links
 
-def get500AccidentPages():
-    keywords = hp.readFileIntoList(cf.ACCIDENT_KEYWORDS_FILE)
+def get500Pages(isAccident):
+    if isAccident:
+        keywords_file = cf.ACCIDENT_KEYWORDS_FILE
+        pages_file = cf.ACCIDENT_PAGES_FILE
+    else:
+        keywords_file = cf.ORDINARY_KEYWORDS_FILE
+        pages_file = cf.ORDINARY_PAGES_FILE
+    pages = set()
+    keywords = hp.readFileIntoList(keywords_file)
     for keyword in keywords:
         print('Getting pages for keyword: ' + keyword)
-        getLinkFromRSS(keyword, cf.ACCIDENT_PAGES_FILE)
+        links = getLinksFromKeyword(keyword)
+        for link in links:
+            pages.add(link)
+    hp.writeListIntoFile(pages, pages_file)
+    print('Wrote pages into file: ' + pages_file)
+
 
 def checkExistClass(class_checking, classes):
     if classes is None: 
@@ -94,8 +110,29 @@ def getContent(html):
         print(e)
         return None
 
+# ignored_tags = ['em', 'input', 'button', 'area', 'base', 'basefont', 'datalist', 'head', 'link',
+#                 'meta', 'noembed', 'noframes', 'param', 'rp', 'script',
+#                 'source', 'style', 'template', 'track', 'title', 'noscript', 'header',
+#                 'footer', 'a', 'select', 'video','videolist','videoitem', 'ul', 'nav']
+
+# def getContent(html):
+#     content = BeautifulSoup(html, "html.parser")
+#     for tag in ignored_tags:
+#         for html_part in content.find_all(tag):
+#             html_part.decompose()
+
+#     text = content.text
+#     text = text.lower()
+#     text.replace("\n", " ")
+#     return " ".join(text.split())
+
 def getContentFromURL(url):
     try:
+        req = Request(url, headers={'User-Agent': "Magic Browser"})
+        f = urlopen(req)
+        html = f.read().decode("utf-8", errors='ignore')
+        f.close()
+        
         html = requests.get(url).text
         doc = getContent(html)
         return doc
@@ -106,30 +143,111 @@ def scrape500Pages(isAccident):
     if isAccident:
         pages_file = cf.ACCIDENT_PAGES_FILE
         data_folder = cf.ACCIDENT_DATA_FOLDER
+        all_nouns_file = cf.ALL_ACCIDENT_NOUNS_FILE
+        reading_index_file = cf.ACCIDENT_READING_INDEX
+        
     else:
         pages_file = cf.ORDINARY_PAGES_FILE
         data_folder = cf.ORDINARY_DATA_FOLDER
+        all_nouns_file = cf.ALL_ORDINARY_NOUNS_FILE
+        reading_index_file = cf.ORDINARY_READING_INDEX
+    
+    try:
+        reading_index = hp.readFileIntoList(reading_index_file)
+        reading_index = int(reading_index[0])
+    except:
+        reading_index = 0
     
     pages = hp.readFileIntoList(pages_file)
-    for page in pages:
+    for page in pages[reading_index:]:
         try:
+            reading_index += 1
+            hp.writeListIntoFile([str(reading_index)], reading_index_file, 'w')
             print('Getting content for page: ' + page)
             doc = getContentFromURL(page)
-            print('Done getting content.')
             print('Extracting nouns from the content...')
-            nouns = [word.lower() for word, tu_loai in pos_tag(doc) if tu_loai == 'N']
-            
-            fileName = data_folder + hp.makeFileName(page)
-            print('Writing nouns into file:' + fileName)
-            hp.writeListIntoFile(nouns, fileName)
-            print('Writing nouns into file:' + cf.ALL_ACCIDENT_NOUNS_FILE)
-            hp.writeListIntoFile(nouns, cf.ALL_ACCIDENT_NOUNS_FILE)
+            if ((doc is not None) and len(doc.strip()) > 0):
+                nouns = [word.lower() for word, tu_loai in pos_tag(doc) if tu_loai == 'N' and hp.isValidWord(word)]
+                fileName = data_folder + hp.makeFileName(page)
+                print('Writing nouns into file:' + fileName)
+                hp.writeListIntoFile(nouns, fileName, 'a')
+                print('Writing nouns into file:' + all_nouns_file)
+                hp.writeListIntoFile(nouns, all_nouns_file, 'a')
         except Exception as e:
             print(e)
             pass
 
+def extractMostCommonNouns(isAccident, max):
+    if isAccident:
+        all_nouns_file = cf.ALL_ACCIDENT_NOUNS_FILE
+        most_common_3000_nouns_file = cf.MOST_COMMON_3000_ACCIDENT
+        print('---Extracting most common accident nouns---')
+    else:
+        all_nouns_file = cf.ALL_ORDINARY_NOUNS_FILE
+        most_common_3000_nouns_file = cf.MOST_COMMON_3000_ORDINARY
+        print('---Extracting most common ordinary nouns---')
+    print('Reading file of all nouns into list...')
+    nouns = hp.readFileIntoList(all_nouns_file)
+    print('Making dictionary of word frequency...')
+    d = hp.listToDict(nouns)
+    words, frequencies = hp.most_common(d, max)
+    hp.writeListIntoFile(words, most_common_3000_nouns_file, 'a')
+    return words
 
+def makeData():
+    accident_nouns = extractMostCommonNouns(isAccident = True, max = cf.MAX_NOUNS)
+    ordinary_nouns = extractMostCommonNouns(isAccident = False, max = cf.MAX_NOUNS)
+    features = accident_nouns + ordinary_nouns
+    label = ['isAccident']
+    fieldNames = features + label
+    hp.writeHeaderCSV(cf.DATASET, fieldNames)
+    
+    accident_files = hp.getFilesInDir(cf.ACCIDENT_DATA_FOLDER + 'content_*.txt')
+    ordinary_files = hp.getFilesInDir(cf.ORDINARY_DATA_FOLDER + 'content_*.txt')
+    for f in accident_files:
+        try:
+            words = hp.readFileIntoList(f)
+            words = hp.listToDict(words)
+            row_dict = {}
+            for feature in features:
+                if feature in words:
+                    row_dict[feature] = words[feature]
+                else:
+                    row_dict[feature] = 0
+            row_dict['isAccident'] = 1
+            hp.writeCSV(cf.DATASET, row_dict, fieldNames)
+        except Exception as e:
+            print(e)
+            pass
+    for f in ordinary_files:
+        try:
+            words = hp.readFileIntoList(f)
+            words = hp.listToDict(words)
+            row_dict = {}
+            for feature in features:
+                if feature in words:
+                    row_dict[feature] = words[feature]
+                else:
+                    row_dict[feature] = 0
+            row_dict['isAccident'] = 0
+            hp.writeCSV(cf.DATASET, row_dict, fieldNames)
+        except Exception as e:
+            print(e)
+            pass
 
 if __name__ == '__main__':
-    # get500AccidentPages()
+    # get500Pages(False)
+    # get500Pages(True)
     scrape500Pages(isAccident = True)
+    scrape500Pages(isAccident = False)
+    # doc = getContentFromURL('https://news.zing.vn/tai-nan-lien-hoan-tren-quoc-lo-1-phu-nu-tu-vong-post867967.html')
+    # print(doc)
+    # print(type(doc))
+    # print('pos tag')
+    # pos_tag(doc)
+    # print('done')
+    # doc = getContentFromURL('https://news.zing.vn/tam-giu-tai-xe-xe-tai-lan-lan-dam-ba-bau-tu-vong-post845164.html')
+    # print(doc)
+    # print(type(doc))
+    
+
