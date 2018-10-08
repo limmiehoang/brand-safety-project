@@ -7,7 +7,6 @@ cycler
 idna
 kiwisolver
 languageflow
-matplotlib
 numpy
 pandas
 pyparsing
