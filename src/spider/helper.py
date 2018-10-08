@@ -1,8 +1,9 @@
-import spider_config as cf
+import spider.spider_config as cf
 import glob
 import csv
 import re
 import operator
+import os
 
 from urllib.parse   import quote
 
@@ -18,6 +19,11 @@ def readFileIntoList(fileName):
     return lines
 
 def writeListIntoFile(theList, fileName, mode):
+    if mode == 'w':
+        exists = os.path.isfile(fileName)
+        if exists:
+            os.rename(fileName, fileName + '.bk')
+
     try:
         with open(fileName, mode) as f:
             for each in theList:
@@ -64,6 +70,9 @@ def getFilesInDir(commonPath):
     return files
 
 def writeHeaderCSV(csvFile, fieldNames):
+    exists = os.path.isfile(csvFile)
+    if exists:
+        os.rename(csvFile, csvFile + '.bk')
     with open(csvFile, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldNames)
         writer.writeheader()
@@ -84,18 +93,6 @@ def readFileIntoDict(fileName):
     except Exception as e:
         print(e)
     return res
-
-def writeDictIntoFile(dict: {}, file_name: str, index: int):
-    location = "output/content_{}.txt".format(index)
-    output_file = open(location, "w")
-    output_file.write(file_name)
-    for pair in dict:
-        try:
-            line = "{} {}\n".format(pair, dict[pair])
-            output_file.write(line)
-        except:
-            print("error")
-    output_file.close()
 
 distracted_words = ['tag', 'video', 'doisongphapluat', 'nghean', 'tinmoi']
 
@@ -128,21 +125,4 @@ def isValidWord(word):
     return True
 
 if __name__ == '__main__':
-    # keywords = readFileIntoList(cf.ACCIDENT_KEYWORDS_FILE)
-    # writeListIntoFile(keywords, 'test.txt')
-    # fileName = makeFileName('https://m.thanhnien.vn/thoi-su/bat-giu-tai-xe-gay-tai-nan-chet-nguoi-roi-bo-chay-994992.html')
-    # print(fileName)
-
-    # files = getFilesInDir(cf.ACCIDENT_DATA_FOLDER + 'content_*.txt')
-    # print(files)
-
-    # fieldNames = ['firstname', 'lastname']
-    # writeHeaderCSV('test.csv', fieldNames)
-    # d1 = {'lastname': 'truong', 'firstname': 'ngu'}
-    # d2 = {'firstname': 'khanh', 'lastname': 'hoang'}
-    
-    # writeCSV('test.csv', d1, fieldNames)
-    # writeCSV('test.csv', d2, fieldNames)
-
-    url = makeSearchURL('xe', 1)
-    print(url)
+    pass

@@ -1,19 +1,16 @@
-# Importing the libraries
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
+from spider.spider import get6000MostCommonNouns, scrape
+from spider.helper import listToDict
 
-def test_load_csv():
-    # Importing the dataset
-    dataset = pd.read_csv('src/model/Social_Network_Ads.csv')
-    X = dataset.iloc[:, [2, 3]].values
-    y = dataset.iloc[:, 4].values
+def test_make_observation():
+    features = get6000MostCommonNouns()
+    nouns = scrape('https://vnexpress.net/tin-tuc/thoi-su/tp-hcm-xay-nha-hat-1-500-ty-tai-thu-thiem-vi-can-cho-nguoi-dan-3820751.html')
+    nouns = listToDict(nouns)
+    res = []
+    for feature in features:
+        if feature in nouns:
+            res.append(nouns[feature])
+        else:
+            res.append(0)
 
-    # Splitting the dataset into the Training set and Test set
-    from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.25, random_state = 0)
-
-    # Feature Scaling
-    sc = StandardScaler()
-    X_train = sc.fit_transform(X_train)
-    X_test = sc.transform(X_test)
+    print(res)
     assert True

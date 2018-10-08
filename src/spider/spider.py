@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import helper as hp
-import spider_config as cf
+import spider.helper as hp
+import spider.spider_config as cf
 import xml.etree.ElementTree as et
 import requests
 import operator
@@ -47,7 +47,7 @@ def get500Pages(isAccident):
         links = getLinksFromKeyword(keyword)
         for link in links:
             pages.add(link)
-    hp.writeListIntoFile(pages, pages_file)
+    hp.writeListIntoFile(pages, pages_file, 'w')
     print('Wrote pages into file: ' + pages_file)
 
 
@@ -139,6 +139,16 @@ def getContentFromURL(url):
     except Exception as e:
         print(e)
 
+def scrape(url):
+    print('Getting content for page: ' + url)
+    doc = getContentFromURL(url)
+    print('Extracting nouns from the content...')
+    nouns = []
+    if ((doc is not None) and len(doc.strip()) > 0):
+        nouns = [word.lower() for word, tu_loai in pos_tag(doc) if tu_loai == 'N' and hp.isValidWord(word)]
+    print('Done extracting nouns.')
+    return nouns
+
 def scrape500Pages(isAccident):
     if isAccident:
         pages_file = cf.ACCIDENT_PAGES_FILE
@@ -163,14 +173,11 @@ def scrape500Pages(isAccident):
         try:
             reading_index += 1
             hp.writeListIntoFile([str(reading_index)], reading_index_file, 'w')
-            print('Getting content for page: ' + page)
-            doc = getContentFromURL(page)
-            print('Extracting nouns from the content...')
-            if ((doc is not None) and len(doc.strip()) > 0):
-                nouns = [word.lower() for word, tu_loai in pos_tag(doc) if tu_loai == 'N' and hp.isValidWord(word)]
+            nouns = scrape(page)
+            if nouns:
                 fileName = data_folder + hp.makeFileName(page)
                 print('Writing nouns into file:' + fileName)
-                hp.writeListIntoFile(nouns, fileName, 'a')
+                hp.writeListIntoFile(nouns, fileName, 'w')
                 print('Writing nouns into file:' + all_nouns_file)
                 hp.writeListIntoFile(nouns, all_nouns_file, 'a')
         except Exception as e:
@@ -191,8 +198,26 @@ def extractMostCommonNouns(isAccident, max):
     print('Making dictionary of word frequency...')
     d = hp.listToDict(nouns)
     words, frequencies = hp.most_common(d, max)
-    hp.writeListIntoFile(words, most_common_3000_nouns_file, 'a')
+    hp.writeListIntoFile(words, most_common_3000_nouns_file, 'w')
+    print('Done extracting most common words.')
     return words
+
+def get6000MostCommonNouns():
+    accident_nouns = hp.readFileIntoList(cf.MOST_COMMON_3000_ACCIDENT)
+    ordinary_nouns = hp.readFileIntoList(cf.MOST_COMMON_3000_ORDINARY)
+    return accident_nouns + ordinary_nouns
+
+def makeObservation(url):
+    features = get6000MostCommonNouns()
+    nouns = scrape(url)
+    nouns = hp.listToDict(nouns)
+    res = []
+    for feature in features:
+        if feature in nouns:
+            res.append(nouns[feature])
+        else:
+            res.append(0)
+    return res
 
 def makeData():
     accident_nouns = extractMostCommonNouns(isAccident = True, max = cf.MAX_NOUNS)
@@ -204,6 +229,7 @@ def makeData():
     
     accident_files = hp.getFilesInDir(cf.ACCIDENT_DATA_FOLDER + 'content_*.txt')
     ordinary_files = hp.getFilesInDir(cf.ORDINARY_DATA_FOLDER + 'content_*.txt')
+    print('---Writing to csv file: ' + cf.DATASET  + '---')
     for f in accident_files:
         try:
             words = hp.readFileIntoList(f)
@@ -234,20 +260,7 @@ def makeData():
         except Exception as e:
             print(e)
             pass
+    print('Done.')
 
 if __name__ == '__main__':
-    # get500Pages(False)
-    # get500Pages(True)
-    scrape500Pages(isAccident = True)
-    scrape500Pages(isAccident = False)
-    # doc = getContentFromURL('https://news.zing.vn/tai-nan-lien-hoan-tren-quoc-lo-1-phu-nu-tu-vong-post867967.html')
-    # print(doc)
-    # print(type(doc))
-    # print('pos tag')
-    # pos_tag(doc)
-    # print('done')
-    # doc = getContentFromURL('https://news.zing.vn/tam-giu-tai-xe-xe-tai-lan-lan-dam-ba-bau-tu-vong-post845164.html')
-    # print(doc)
-    # print(type(doc))
-    
-
+    pass
